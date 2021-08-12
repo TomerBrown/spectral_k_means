@@ -53,7 +53,7 @@ def max_off_diagonal(A):
     max_val = abs(A[1, 0])
     x, y = 1, 0
     for i in range(n):
-        for j in range(m):
+        for j in range(i,m):
             num = A[i, j]
             if (i != j and abs(num) > abs(max_val)):
                 max_val = abs(num)
@@ -74,7 +74,7 @@ def create_p(A):
     """:returns the matrix P corresponding to the given matrix A"""
     n, m = A.shape
     i, j = max_off_diagonal(A)
-    theta = (A[i, j] - A[i, i]) / (2 * A[i, j])
+    theta = (A[j, j] - A[i, i]) / (2 * A[i, j])
     t = sign(theta) / (abs(theta) + math.sqrt(theta ** 2 + 1))
     c = 1 / (math.sqrt(t ** 2 + 1))
     s = t * c
@@ -99,7 +99,7 @@ def is_diag(A):
 def off(A):
     """Implementing the off of matrix as described in project """
     n,m = A.shape
-    frob = np.sum(np.sum(np.power(A,2)))
+    frob = math.sqrt(np.sum(np.sum(np.power(A,2))))
     diag = 0
     for i in range (n):
         diag += A[i,i]**2
@@ -111,11 +111,8 @@ def jacobi_algo(A , epsilon = 0.001):
     p  = create_p(A)
     V= p
     A_prime = (p.T@A)@p
-    print(off(A))
-    print(off(A_prime))
-    while (off(A)-off(A_prime)>epsilon):
-        c+=1
-        print(c)
+    #while (not is_diag(A)):
+    while (off(A)-off(A_prime)>epsilon ):
         A = A_prime
         p  = create_p(A)
         V = V@p
@@ -134,6 +131,14 @@ def test_max_d():
     print((is_diag(arr)))
     arr2 = np.array([[1,2],[3,4]])
     print(off(arr2))
+
+
+def test_jacobi():
+    mat = np.random.random((7,7))*100
+    eig = np.linalg.eigh(mat)[0]
+    print(eig)
+    eig2 = jacobi_algo(mat)[0]
+    print(eig2)
 
 
 path = "tests/input_1.txt"
@@ -156,4 +161,4 @@ l_norm = l_norm_mat(W, D_half)
 eigval , eigvectors = jacobi_algo(l_norm)
 eigval = sorted(eigval)
 print(eigval)
-
+test_jacobi()
