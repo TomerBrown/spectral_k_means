@@ -2,12 +2,10 @@ import pandas as pd
 import numpy as np
 import math
 
-
 def l2_norm(point1, point2):
     """Computes the l2 norm of two given points"""
     result = np.sqrt(np.sum(((point1 - point2) ** 2)))
     return result
-
 
 def weighted_adj_mat(matrix):
     """ Computes the matrix W given it's definition as exponent of half of l2 norm """
@@ -24,7 +22,6 @@ def weighted_adj_mat(matrix):
                 W[j, i] = W[i, j]
     return W
 
-
 def diagonal_degree_mat(W):
     """Given W - The Wighted Adjacency matrix, computes it's diagonal degree matrix - D"""
     n, m = W.shape
@@ -33,58 +30,20 @@ def diagonal_degree_mat(W):
         D[i, i] = np.sum(W[i, :])
     return D
 
-
 def pow_diag(D, pow):
     """ given a matrix and a real num - pow, Changes D so with D_new[i,i] = D[i,i]**pow only on diagonal entries"""
     n, m = D.shape
     for i in range(n):
         D[i, i] = D[i, i] ** pow
 
-
 def l_norm_mat(W, D_half):
     """Computes the Lnorm Matrix given it's definition"""
     n, m = W.shape
     return np.identity(n) - D_half @ W @ D_half
 
-
-def max_off_diagonal(A):
-    """ :returns tuple (x,y) so A[x,y] is the biggest (by absolute value) of all non- diagonal entries of A"""
-    n, m = A.shape
-    max_val = abs(A[1, 0])
-    x, y = 1, 0
-    for i in range(n):
-        for j in range(m):
-            num = A[i, j]
-            if (i != j and abs(num) > abs(max_val)):
-                max_val = abs(num)
-                x = i
-                y = j
-    return (x, y)
-
-
 def sign(num):
-    """:returns -1 if num<0 else 1"""
-    if (num < 0):
-        return -1
-    else:
-        return 1
-
-
-def create_p(A):
-    """:returns the matrix P corresponding to the given matrix A"""
-    n, m = A.shape
-    i, j = max_off_diagonal(A)
-    theta = (A[i, j] - A[i, i]) / (2 * A[i, j])
-    t = sign(theta) / (abs(theta) + math.sqrt(theta ** 2 + 1))
-    c = 1 / (math.sqrt(t ** 2 + 1))
-    s = t * c
-    p = np.identity(n)
-    p[i, i] = c
-    p[j, j] = c
-    p[i, j] = s
-    p[j, i] = -s
-    return p
-
+    """return 1 if num>=0 else -1"""
+    return -1 if (num<0) else 1
 
 def is_diag(A):
     """:returns whether the given matrix A is diagonal """
@@ -95,45 +54,122 @@ def is_diag(A):
                 return False
     return True
 
+def is_simmetric(A):
+    for i in range (n):
+        for j in range (m):
+            if (A[i,j]-A[j,i])**2>0.00001:
+                return False
+    return True
+
 
 def off(A):
-    """Implementing the off of matrix as described in project """
+    """return the value of off as defined in project"""
     n,m = A.shape
-    frob = np.sum(np.sum(np.power(A,2)))
-    diag = 0
-    for i in range (n):
-        diag += A[i,i]**2
-    return frob-diag
+    forb = np.sum(np.power(A,2))
+    diag = sum([(A[i,i]**2) for i in range (n)])
+    return (forb-diag)
+
+def max_off_diagonal(A):
+    """ params: a matrix A
+    returns the a tuple of indices (x,y) such that A[x,y] maximum of off diagonal entries
+     by absolute value"""
+
+    smaller_size = min(A.shape)
+    if (smaller_size <= 1):
+        return None
+
+    # Initialize variables
+    n, m = A.shape
+    x, y = 0, 1
+    max_val = A[x, y]
+
+    # search entry by entry over the upper triangle of matrix and find maximum
+    for i in range(n):
+        for j in range(m):
+            num = A[i, j]
+            if (i != j and abs(num) > abs(max_val)):
+                max_val = num
+                x = i
+                y = j
+    return (x, y)
+
+def build_p (A):
+    """Create a matrix p as defined in project description"""
+
+    #initialize shape
+    n,m = A.shape
+
+    # Find indices of off diagonal maximum entry and make sure j>i
+    i, j = max_off_diagonal(A)
+    if (j<i):
+        temp = j
+        j = i
+        i = temp
+
+    # Compute variables needed for building matrix p
+    theta = (A[j, j] - A[i, i]) / (2 * A[i, j])
+    t = sign(theta) / (abs(theta) + math.sqrt((theta ** 2) + 1))
+    c = 1 / (math.sqrt(t ** 2 + 1))
+    s = t * c
+
+    #put the correct values accorindg to p's definition
+    p = np.identity(n)
+    p[i,i] = c
+    p[j,j] = c
+    p[i,j] = s
+    p[j,i] = -s
+
+    return p
+def calac_A_prime(A):
+    n, m = A.shape
+    i, j = max_off_diagonal(A)
+    if (j < i):
+        temp = j
+        j = i
+        i = temp
+
+    # Compute variables needed for building matrix p
+    theta = (A[j, j] - A[i, i]) / (2 * A[i, j])
+    t = sign(theta) / (abs(theta) + math.sqrt((theta ** 2) + 1))
+    c = 1 / (math.sqrt(t ** 2 + 1))
+    s = t * c
+    A_prime = A.copy()
+    for r in range (n):
+        if (r!=i and r!=j):
+            A_prime[r,i] = c*A[r,i]-s*A[r,j]
+            A_prime[r,j] = c*A[r,j]+s*A[r,i]
+    A_prime[i,i] = (c**2)*A[i,i] + (s**2)*A[j,j]- 2*s*c*A[i,j]
+    A_prime[j, j] = (s ** 2) * A[i, i] + (c ** 2) * A[j, j] + 2 * s * c * A[i, j]
+    A_prime [i,j] = 0
+    return A_prime
+
+def similarity (A,B):
+    C = (A-B)**2
+    sum = np.sum(C)
+    return sum
 
 
-def jacobi_algo(A , epsilon = 0.001):
+def jacobi_algorithm(A , epsilon = 0.0 01):
+    """Given a matrix perfroms the Jacobi algorithm
+    and returns a tuple (eigvals, eigvectors)"""
     n,m = A.shape
-    p  = create_p(A)
-    V= p
-    A_prime = (p.T@A)@p
-    print(off(A))
-    print(off(A_prime))
-    while (off(A)-off(A_prime)>epsilon):
+    p = build_p(A)
+    eigvecs = p
+    A_prime = p.T@A@p
+    c = 0
+    while(off(A)-off(A_prime)<epsilon and c<100):
         c+=1
-        print(c)
         A = A_prime
-        p  = create_p(A)
-        V = V@p
-        A_prime = p.T@A@p
-    eigval = []
-    for i in range (n):
-        eigval.append(A[i,i])
-    return (eigval,V)
+        p = build_p(A)
+        eigvecs = eigvecs@p
+        A_prime = p.T @ A @ p
+        ###################Testing#####################
+        A_prime2 = calac_A_prime(A)
+        ########################################
+    eigvals = [A_prime[i,i] for i in range (n)]
 
+    return (eigvals,eigvecs)
 
-
-
-def test_max_d():
-    arr = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
-    print(max_off_diagonal(arr))
-    print((is_diag(arr)))
-    arr2 = np.array([[1,2],[3,4]])
-    print(off(arr2))
 
 
 path = "tests/input_1.txt"
@@ -141,7 +177,7 @@ path = "tests/input_1.txt"
 # Load File and convert it to numpy array
 df = pd.read_csv(path, header=None)
 matrix = df.to_numpy()
-
+n,m = matrix.shape
 # Calculate W
 W = weighted_adj_mat(matrix)
 
@@ -152,8 +188,13 @@ D = diagonal_degree_mat(W)
 pow_diag(D, -0.5)
 D_half = D
 
+#Calculate L_norm
 l_norm = l_norm_mat(W, D_half)
-eigval , eigvectors = jacobi_algo(l_norm)
-eigval = sorted(eigval)
-print(eigval)
 
+#Get eigenvalues and eigenvectors from Jacobi Algorithm
+eigvals, eigvecs = jacobi_algorithm(l_norm)
+
+eigvals = sorted(eigvals)
+eigvals_np = sorted(np.linalg.eigvals(l_norm).tolist())
+print(eigvals)
+print(eigvals_np)

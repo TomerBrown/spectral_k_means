@@ -4,7 +4,7 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_C
-  "C:/Users/Tomer/CLionProjects/SpectralKMeans/main.c" "C:/Users/Tomer/CLionProjects/SpectralKMeans/cmake-build-debug/CMakeFiles/SpectralKMeans.dir/main.c.obj"
+  "C:/Users/Tomer/CLionProjects/Spectral_k_means/spectral_k_means/main.c" "C:/Users/Tomer/CLionProjects/Spectral_k_means/spectral_k_means/cmake-build-debug/CMakeFiles/SpectralKMeans.dir/main.c.obj"
   )
 set(CMAKE_C_COMPILER_ID "GNU")
 
