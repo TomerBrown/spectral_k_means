@@ -87,7 +87,7 @@ def sign(num):
 def off(A):
     """return the value of off as defined in project"""
     n,m = A.shape
-    forb = np.sum(np.sum(np.power(A,2)))
+    forb = np.sum(np.power(A,2))
     diag = sum([(A[i,i]**2) for i in range (n)])
     return (forb-diag)
 
@@ -128,7 +128,7 @@ def jacobi_algorithm(A , epsilon = 0.001):
     eigvecs = p
     A_prime = p.T@A@p
     c = 0
-    while(off(A)-off(A_prime)>epsilon):
+    while(off(A_prime)>epsilon and c < 100):
         c+=1
         A = A_prime
         p = build_p(A)
@@ -139,17 +139,18 @@ def jacobi_algorithm(A , epsilon = 0.001):
     return (eigvals,eigvecs)
 
 def build_rand_symmetric(n):
-    A = np.random.rand(n, n)
+    A = np.random.uniform(low=-1, high=1, size=(n,n))
     for i in range (n):
         for j in range(i,n):
             A[j,i] = A[i,j]
+            if i == j:
+                A[i,j] = 1
     return A
 
 def test_jacobi(iters=50, max_size = 100):
-    np.random.seed(0)
     error = False
-    for iter in range (iters):
-        n = random.randint(2,max_size)
+    for iter in range(iters):
+        n = random.randint(2, max_size)
         A = build_rand_symmetric(n)
         eigvals, eigvecs = jacobi_algorithm(A)
         eigvals_np = np.linalg.eigvalsh(A).tolist()
@@ -160,10 +161,27 @@ def test_jacobi(iters=50, max_size = 100):
             print ("Error in test of jacobi\nmatrix is:")
             print(A)
             error = True
+        else:
+            print("OK")
     if (not error):
         print ("Jacobi test Passed")
 
-test_jacobi(iters=3)
+# A = build_rand_symmetric(6)
+if __name__ == '__main__':
+    test_jacobi()
+# eigvals, eigvects = jacobi_algorithm(A)
+
+# eigvals2, eigvects2 = np.linalg.eig(A)
+
+# print (sorted(eigvals))
+# print("-"*100)
+# print(sorted(eigvals2))
+# print("-"*100)
+# print(eigvects)
+# print("-"*100)
+# print(eigvects2)
+
+
 
 
 

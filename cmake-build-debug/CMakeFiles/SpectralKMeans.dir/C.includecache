@@ -6,7 +6,7 @@
 
 #IncludeRegexTransform: 
 
-C:/Users/Tomer/CLionProjects/Spectral_k_means/spectral_k_means/main.c
+C:/Users/Tomer/CLionProjects/spectral_k_means/main.c
 stdio.h
 -
 stdlib.h

@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import math
+from tqdm import tqdm
+import Jacobi
 
 def l2_norm(point1, point2):
     """Computes the l2 norm of two given points"""
@@ -74,10 +76,6 @@ def max_off_diagonal(A):
     returns the a tuple of indices (x,y) such that A[x,y] maximum of off diagonal entries
      by absolute value"""
 
-    smaller_size = min(A.shape)
-    if (smaller_size <= 1):
-        return None
-
     # Initialize variables
     n, m = A.shape
     x, y = 0, 1
@@ -85,7 +83,7 @@ def max_off_diagonal(A):
 
     # search entry by entry over the upper triangle of matrix and find maximum
     for i in range(n):
-        for j in range(m):
+        for j in range(i+1, m):
             num = A[i, j]
             if (i != j and abs(num) > abs(max_val)):
                 max_val = num
@@ -101,7 +99,7 @@ def build_p (A):
 
     # Find indices of off diagonal maximum entry and make sure j>i
     i, j = max_off_diagonal(A)
-    if (j<i):
+    if (j<i and 0==1):
         temp = j
         j = i
         i = temp
@@ -123,10 +121,7 @@ def build_p (A):
 def calac_A_prime(A):
     n, m = A.shape
     i, j = max_off_diagonal(A)
-    if (j < i):
-        temp = j
-        j = i
-        i = temp
+
 
     # Compute variables needed for building matrix p
     theta = (A[j, j] - A[i, i]) / (2 * A[i, j])
@@ -149,7 +144,7 @@ def similarity (A,B):
     return sum
 
 
-def jacobi_algorithm(A , epsilon = 0.0 01):
+def jacobi_algorithm(A , epsilon = 1.5):
     """Given a matrix perfroms the Jacobi algorithm
     and returns a tuple (eigvals, eigvectors)"""
     n,m = A.shape
@@ -157,44 +152,56 @@ def jacobi_algorithm(A , epsilon = 0.0 01):
     eigvecs = p
     A_prime = p.T@A@p
     c = 0
-    while(off(A)-off(A_prime)<epsilon and c<100):
+    pbar = tqdm(range(100))
+    for t in pbar:
+        dev1 = off(A)-off(A_prime)
+        dev2 = off(A_prime)
+        pbar.set_description(f'{dev1}, {dev2}')
+        if dev2 < epsilon:
+            break
         c+=1
-        A = A_prime
+        A = A_prime.copy()
         p = build_p(A)
         eigvecs = eigvecs@p
-        A_prime = p.T @ A @ p
+        #A_prime = p.T @ A @ p
+        A_prime = calac_A_prime(A)
+
         ###################Testing#####################
-        A_prime2 = calac_A_prime(A)
+        #A_prime2 = calac_A_prime(A)
         ########################################
     eigvals = [A_prime[i,i] for i in range (n)]
 
     return (eigvals,eigvecs)
 
 
+if __name__ == "__main__":
+    path = "tests/input_1.txt"
 
-path = "tests/input_1.txt"
+    # Load File and convert it to numpy array
+    df = pd.read_csv(path, header=None)
+    matrix = df.to_numpy()
+    n,m = matrix.shape
+    # Calculate W
+    W = weighted_adj_mat(matrix)
 
-# Load File and convert it to numpy array
-df = pd.read_csv(path, header=None)
-matrix = df.to_numpy()
-n,m = matrix.shape
-# Calculate W
-W = weighted_adj_mat(matrix)
+    # Calculate D
+    D = diagonal_degree_mat(W)
 
-# Calculate D
-D = diagonal_degree_mat(W)
+    # Calculate D_half
+    pow_diag(D, -0.5)
+    D_half = D
 
-# Calculate D_half
-pow_diag(D, -0.5)
-D_half = D
+    #Calculate L_norm
+    l_norm = l_norm_mat(W, D_half)
 
-#Calculate L_norm
-l_norm = l_norm_mat(W, D_half)
 
-#Get eigenvalues and eigenvectors from Jacobi Algorithm
-eigvals, eigvecs = jacobi_algorithm(l_norm)
+    #Get eigenvalues and eigenvectors from Jacobi Algorithm
+    eigvals, eigvecs = jacobi_algorithm(l_norm)
 
-eigvals = sorted(eigvals)
-eigvals_np = sorted(np.linalg.eigvals(l_norm).tolist())
-print(eigvals)
-print(eigvals_np)
+    eigvals = sorted(eigvals)
+    eigvals_np = sorted(np.linalg.eigvals(l_norm).tolist())
+
+    # print(eigvals)
+    [print(f'{eigvals[i]} - {eigvals_np[i]} = {abs(eigvals[i] - eigvals_np[i])}') for i in range(n)]
+    # print("*"*100)
+    # print(eigvals_np)

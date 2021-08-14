@@ -222,7 +222,8 @@ bool mat_is_equal(Matrix* A,Matrix* B){
 //Performs Matrix multiplication
 Matrix mat_mul (Matrix* A,Matrix* B){
     //Initialize parameters need later
-    int i,j,k,sum;
+    int i,j,k;
+    double sum;
     int n1 = A->n;
     int n2 = B->n;
     int m1 = A->m;
@@ -350,8 +351,153 @@ double mat_total_sum (Matrix* A){
     return sum;
 }
 
+//given index i returns the i'th row in the Matrix A
+double* mat_get_row (Matrix* A, int i){
+    int n = A->n;
+    int m = A->m;
+    assert(i<n && i>=0);
+    int j;
+    double* row = calloc(m ,sizeof(double ));
+    for (j=0; j<m; j++){
+        row[j] = A->array[i][j];
+    }
+    return row;
+}
+
+//given index j returns the j'th row in the Matrix A
+double* mat_get_col (Matrix* A, int j){
+    int n = A->n;
+    int m = A->m;
+    assert(j<m && j>=0);
+    int i;
+    double* col = calloc(m , sizeof(double ));
+    for (i=0; i<m; i++){
+        col[i] = A->array[i][j];
+    }
+    return col;
+}
+
+//given index i returns the i'th row in the Data type data
+double* data_get_row (Data* data, int i){
+    int n = data->n;
+    int m = data->m;
+    assert(i<n && i>=0);
+    int j;
+    double* row = calloc(m ,sizeof(double ));
+    for (j=0; j<m; j++){
+        row[j] = data->array[i][j];
+    }
+    return row;
+}
+
+//given index j returns the j'th row in the Data type data
+double* data_get_col (Data* data, int j){
+    int n = data->n;
+    int m = data->m;
+    assert(j<m && j>=0);
+    int i;
+    double* col = calloc(m , sizeof(double ));
+    for (i=0; i<m; i++){
+        col[i] = data->array[i][j];
+    }
+    return col;
+}
+
+//*********************************************************************************//
+//************************   Algorithm Related Functions  ****************************//
+//*********************************************************************************//
+
+//returns the l2 norm of 2 points (point1, point2)
+double l2_norm (double* point1, double* point2, int n){
+    int i;
+    double sum =0;
+    double value;
+
+    for (i=0; i<n ; i++){
+        value = point1[i] - point2[i];
+        value = pow(value,2);
+        sum += value;
+    }
+    return sqrt(sum);
+}
+
+//returns 1 if num>=0 else returns -1
+int sign (double num){
+    if (num<0){
+        return -1;
+    }
+    else{
+        return 1;
+    }
+}
+
+//Build the weighted adjacency matrix W[i,j] = exp(-l2(p1,p2)/2)
+Matrix build_W (Data* data){
+    //Initialize Variables
+    int i,j;
+    int n = data->n;
+    int d = data->m;
+    Matrix W = zeros(n,n);
+    double* point1;
+    double* point2;
+    double l2;
+    double value;
+
+    //Loop and calculate W
+    for (i=0 ; i<n ; i++){
+        for (j=i+1; j<n; j++){
+            point1 = data_get_row(data, i);
+            point2 = data_get_row(data, j);
+            l2 = l2_norm(point1, point2, d);
+            value = exp(-l2/2);
+            W.array[i][j] = value;
+            W.array[j][i] = value;
+            free(point1);
+            free(point2);
+        }
+    }
+    return W;
+}
+
+//Build Diagonal Degree Matrix D, given the weighted Matrix (must be squared) W
+Matrix build_D (Matrix* W){
+
+    int n = W->n;
+    int i;
+    Matrix D = zeros(n,n);
+    for (i=0; i<n ; i++){
+        D.array[i][i] = mat_sum_by_row(W,i);
+    }
+    return D;
+}
+
+//Build D_half given the matrix D , given the Diagonal degree matrix D
+Matrix build_D_half (Matrix* D){
+    return mat_pow_diagonal(D, -0.5);
+}
+
+Matrix laplacian (Matrix* D_half, Matrix* W){
+    int n = D_half->n;
+
+    //Calculate everything necessary
+    Matrix temp_val1 = mat_mul(D_half,W); //D_half @ W
+    Matrix temp_val2 = mat_mul(&temp_val1,D_half); // D_half @ W @ D_half
+    Matrix I = mat_identity(n);
+    Matrix ret_mat = mat_sub(&I,&temp_val2); //I - D_half @ W @ D_half
+
+    //free everything that is needed
+    free_mat(&temp_val1);
+    free_mat(&temp_val2);
+    free_mat(&I);
+
+    return ret_mat;
+}
+
+//
 
 //**************** Tests *******************
+
+//Tests for Matrix Operations
 void test_transpose_and_copy(){
     printf("--------------------------------------------------\n");
     printf("---Tests for Transpose and copy Functions----\n");
@@ -538,12 +684,52 @@ void all_mat_tests(){
     test_mat_iden();
     test_sums();
 }
+
+//Tests for algorithm (need to compare with python implemantation
+
+void mat_to_file(Matrix* mat, char* file_name){
+    FILE* fptr;
+    char* pre = "C:\\Users\\Tomer\\CLionProjects\\spectral_k_means\\tests\\";
+    char name [1024] = {0};
+    strcat(name,pre);
+    strcat(name,file_name);
+
+    fptr = fopen(name,"w");
+    int i, j;
+    int n= mat->n;
+    int m= mat->m;
+
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < m; j++) {
+            fprintf(fptr,"%f", mat->array[i][j]);
+            if (j != m - 1) {
+                fprintf(fptr,",");
+            }
+        }
+        fprintf(fptr , "\n");
+    }
+    fclose(fptr);
+}
+void test_WDH(Data* data){
+    Matrix W  = build_W(data);
+    mat_to_file(&W,"out_w.txt");
+    Matrix D  = build_D(&W);
+    mat_to_file(&D,"out_D.txt");
+    Matrix D_half  = build_D_half(&D);
+    mat_to_file(&D_half,"out_D_half.txt");
+    Matrix l_norm = laplacian(&D_half,&W);
+    mat_to_file(&l_norm,"out_lap.txt");
+}
+
+
+
+
 //********************************************
 
 
 int main(){
-    Data data = load_data("C:\\Users\\Tomer\\CLionProjects\\SpectralKMeans\\tests\\input.txt");
-    all_mat_tests();
+    Data data = load_data("C:\\Users\\Tomer\\CLionProjects\\spectral_k_means\\tests\\input.txt");
+    test_WDH(&data);
 
 
 }
