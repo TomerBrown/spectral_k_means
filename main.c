@@ -6,6 +6,7 @@
 #define MAX_POINTS 1000
 #define MAX_DIMS  10
 #define LINE_LENGTH 1024
+#define EPSILON 0.001
 
 //bool type (false and true)
 typedef enum bool{
@@ -448,7 +449,7 @@ Matrix build_W (Data* data){
         for (j=i+1; j<n; j++){
             point1 = data_get_row(data, i);
             point2 = data_get_row(data, j);
-            l2 = l2_norm(point1, point2, d);
+             l2 = l2_norm(point1, point2, d);
             value = exp(-l2/2);
             W.array[i][j] = value;
             W.array[j][i] = value;
@@ -476,6 +477,7 @@ Matrix build_D_half (Matrix* D){
     return mat_pow_diagonal(D, -0.5);
 }
 
+//Build l_norm Matrix (The laplacian) of the graph
 Matrix laplacian (Matrix* D_half, Matrix* W){
     int n = D_half->n;
 
@@ -493,9 +495,182 @@ Matrix laplacian (Matrix* D_half, Matrix* W){
     return ret_mat;
 }
 
-//
 
-//**************** Tests *******************
+//Struct to Store entry of the matrix (i,j)
+typedef struct Index{
+    int x;
+    int y;
+} Index;
+
+//Returns a struct Index element  index such that A[index.x, index.y] is the maximum element in A which is not on the diagonal
+Index off_diagonal_index (Matrix* A){
+    //Initialize variables need later
+    Index idx;
+    idx.x = 0;
+    idx.y = 1;
+    int n = A->n;
+    int i;
+    int j;
+    double num;
+    double max_val = A->array[idx.x][idx.y];
+
+    for (i=0; i<n; i++){
+        for (j=i+1; j<n; j++){
+            num = A->array[i][j];
+            if (fabs(num)>fabs(max_val)){
+                max_val = num;
+                idx.x = i;
+                idx.y = j;
+            }
+        }
+    }
+    return idx;
+}
+
+//returns a Matrix P built as described in Project's Description
+Matrix build_P (Matrix* A){
+    int n = A->n;
+    Matrix P = mat_identity(n);
+    double** arr = A->array;
+
+    //find the index of the largest off diagonal element
+    Index idx = off_diagonal_index(A);
+    int i = idx.x;
+    int j = idx.y;
+
+
+    //Calculate Values of theta, c, s, t
+    double theta = (arr[j][j] - arr[i][i])/(2.0 *arr[i][j]);
+    double t = sign(theta)/ (fabs(theta) + sqrt(theta*theta +1));
+    double c = 1 / sqrt(t*t+1);
+    double s = t*c;
+
+    //Update Values in the correct places in P
+    P.array[i][i] = c;
+    P.array[j][j] = c;
+    P.array[i][j] = s;
+    P.array[j][i] = -s;
+
+    return P;
+
+}
+
+//Return the sum of squares of all non diagonal entries
+double off (Matrix* A){
+    //Initialize Parameters needed later
+    double sum = 0;
+    int i,j;
+    int n = A->n;
+
+    //Sum all squares of non diagonal entries
+    for (i=0; i<n; i++){
+        for (j=0; j<n; j++){
+            if (i!=j){
+                sum += pow(A->array[i][j],2);
+            }
+        }
+    }
+    return sum;
+}
+
+//Struct to store eigenvalues and eigenvectors output from Jacobi Algorithm
+typedef struct Eigen{
+    double* eigvals;
+    Matrix eigvects;
+} Eigen;
+
+//A function to depp free the Eigen Struct
+void free_eigen(Eigen* eigen){
+    free_mat(&eigen->eigvects);
+    free(eigen->eigvals);
+}
+
+//Calculate A_prime according to the definition in project based on indices (not matrix multiplication)
+Matrix calc_A_prime(Matrix* A){
+    //Initialize variables
+    double** arr = A->array;
+    int n = A->n;
+    Matrix A_prime = mat_copy(A);
+    int r;
+
+    //find the index of the largest off diagonal element
+    Index idx = off_diagonal_index(A);
+    int i = idx.x;
+    int j = idx.y;
+
+
+    //Calculate Values of theta, c, s, t
+    double theta = (arr[j][j] - arr[i][i])/(2.0 *arr[i][j]);
+    double t = sign(theta)/ (fabs(theta) + sqrt(theta*theta +1));
+    double c = 1 / sqrt(t*t+1);
+    double s = t*c;
+
+    for (r =0; r<n; r++){
+        if (r!=i && r!=j){
+            A_prime.array[r][i] = c * arr[r][i] - s * arr[r][j];
+            A_prime.array[r][j] = c * arr[r][j] + s* arr [r][i];
+        }
+    }
+    A_prime.array[i][i] = c*c*arr[i][i] + s*s*arr[j][j] - 2*s*c*arr[i][j];
+    A_prime.array[j][j] = s*s*arr[i][i] + c*c*arr[j][j] + 2*s*c*arr[i][j];
+    A_prime.array[i][j] = 0;
+    A_prime.array[j][i] = 0;
+
+    return A_prime;
+}
+
+
+Eigen jacobi_algorithm(Matrix* mat){
+
+    int n = mat->n;
+    int i;
+    //Calculate A, A', P, V (Initialized)
+    Matrix A = mat_copy(mat); //Create a Copy so won't destroy original
+    Matrix P = build_P(&A);
+    Matrix A_prime = calc_A_prime(&A);
+    Matrix V = mat_copy(&P); //in the future V =P1 @P2 @ P3.....
+    Matrix V_temp;
+    double diff = off(&A) - off(&A_prime);
+    int c =0;
+
+
+    while (diff> EPSILON && c<100){
+
+
+        //printf("Jacobi Iteration number %d.| diff is %f|off(A') =  %f\n",c,diff,off(&A_prime));
+        //Free What needs to be Free
+        free_mat(&A);
+        free_mat(&P);
+
+        //Build A_prime and P
+        A = A_prime;
+        P = build_P(&A);
+        A_prime = calc_A_prime(&A);
+
+        //Update Eigenvectors Matrix
+        V_temp = mat_mul(&V,&P); //A temporary variable so V can be freed later
+        free_mat(&V);
+        V = V_temp;
+
+        diff = off(&A) - off(&A_prime);
+        c++;
+    }
+
+    //return Value as Struct - eigvals (array of doubles) and eigvecs (Matrix)
+    Eigen eigen;
+    eigen.eigvals = calloc(n,sizeof (double));
+    for (i=0;i<n;i++){
+        eigen.eigvals[i] = A_prime.array[i][i];
+    }
+    eigen.eigvects = V;
+
+    return eigen;
+
+}
+
+//*********************************************************************************//
+//******************************* **  Tests *************************************//
+//*********************************************************************************//
 
 //Tests for Matrix Operations
 void test_transpose_and_copy(){
@@ -710,6 +885,24 @@ void mat_to_file(Matrix* mat, char* file_name){
     }
     fclose(fptr);
 }
+void array_to_file(double * mat,int n ,char* file_name){
+    FILE* fptr;
+    char* pre = "C:\\Users\\Tomer\\CLionProjects\\spectral_k_means\\tests\\";
+    char name [1024] = {0};
+    strcat(name,pre);
+    strcat(name,file_name);
+
+    fptr = fopen(name,"w");
+    int i, j;
+
+    for (i = 0; i < n; i++) {
+            fprintf(fptr,"%f",mat[i]);
+            if (i != n - 1) {
+                fprintf(fptr,",");
+        }
+    }
+    fclose(fptr);
+}
 void test_WDH(Data* data){
     Matrix W  = build_W(data);
     mat_to_file(&W,"out_w.txt");
@@ -719,7 +912,44 @@ void test_WDH(Data* data){
     mat_to_file(&D_half,"out_D_half.txt");
     Matrix l_norm = laplacian(&D_half,&W);
     mat_to_file(&l_norm,"out_lap.txt");
+    Matrix P = build_P(&l_norm);
+    mat_to_file(&P,"out_p.txt");
+    Eigen eigen = jacobi_algorithm(&l_norm);
+    mat_to_file(&eigen.eigvects,"out_eigvects.txt");
+    array_to_file(eigen.eigvals,eigen.eigvects.n,"out_eigvals.txt");
+
+
+
+
+    /*free_mat(&W);
+    free_mat(&D);
+    free_mat(&D_half);
+    free_mat(&l_norm);
+    free_mat(&P);
+    free_eigen(&eigen);*/
 }
+void test_off_diag (){
+    Matrix mat = zeros(5,5);
+    int i;
+    int j;
+    int t=1;
+    int c =1;
+    int n = mat.n;
+
+    for (i=0; i<n; i++){
+        for (j=i; j<n; j++){
+            mat.array [i][j] = t*c*sqrt(5);
+            mat.array [j][i] = t*c*sqrt(5);
+            t = t*-1;
+            c++;
+        }
+    }
+    printf("This is Mat: \n");
+    print_mat(&mat);
+    Index idx = off_diagonal_index(&mat);
+    printf("largest value is in index (%d,%d): \n", idx.x, idx.y);
+}
+
 
 
 
@@ -730,6 +960,7 @@ void test_WDH(Data* data){
 int main(){
     Data data = load_data("C:\\Users\\Tomer\\CLionProjects\\spectral_k_means\\tests\\input.txt");
     test_WDH(&data);
+    //test_off_diag();
 
 
 }
